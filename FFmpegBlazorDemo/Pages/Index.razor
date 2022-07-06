@@ -1,9 +1,137 @@
 ﻿@page "/"
+@using FFmpegBlazor
+@inject IJSRuntime Runtime
+@using Microsoft.AspNetCore.Components.Forms
 
-<PageTitle>Index</PageTitle>
+<PageTitle>Convert to MP3</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Convert MP4 to MP3</h1>
 
-Welcome to your new app.
+<InputFile OnChange="LoadVideoFile" />
+<br />
+<br />
+<video width="300" height="200" autoplay controls src="@videoInputUrl" />
+<br />
+<br />
+<input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
+<br />
+<br />
+<button class="btn btn-primary" @onclick="Process">Convert to MP3</button>
+<br />
+<br />
+<audio controls src="@audioOutputUrl" />
 
-<SurveyPrompt Title="How is Blazor working for you?" />
+<br />
+<Logger LogMessages="@logMessages" Progress="@progress" Rows="35"/>
+
+@code
+{
+    FFMPEG ffMpeg;
+    byte[] videoBuffer;
+    string videoInputUrl = string.Empty;
+    string audioOutputUrl = string.Empty;
+    string logMessages = string.Empty;
+    string progress = string.Empty;
+    bool download = false;
+    const string inputFile = "input.mp4";
+    const string outputFile = "output.mp3";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Wire-up events
+        if (FFmpegFactory.Runtime == null)
+        {
+            FFmpegFactory.Logger += LogToConsole;
+            FFmpegFactory.Progress += ProgressChange;
+        }
+
+        // Initialize Library
+        await FFmpegFactory.Init(Runtime);
+    }
+
+    private async void LoadVideoFile(InputFileChangeEventArgs v)
+    {
+        // Clear logs and progress
+        logMessages = string.Empty;
+        progress = string.Empty;
+        
+        // Get fist file from input selection
+        var file = v.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        videoBuffer = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(videoBuffer);
+
+        // Create a video link from the buffer, so that video can be played
+        videoInputUrl = FFmpegFactory.CreateURLFromBuffer(videoBuffer, inputFile, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void Process()
+    {
+        // Create an instance of FFmpeg
+        ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });
+
+        // Download all dependencies from the CDN
+        await ffMpeg.Load();
+
+        if (!ffMpeg.IsLoaded) return;
+
+        // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
+        ffMpeg.WriteFile(inputFile, videoBuffer);
+
+        // Pass CLI argument here equivalent to ffmpeg -i inputFile.mp4 outputFile.mp3
+        await ffMpeg.Run("-i", inputFile, outputFile);
+
+        // Delete in-memory file
+        // ff.UnlinkFile(inputFile);
+    }
+
+    private async void ProgressChange(Progress message)
+    {
+        // Display progress % (0-1)
+        progress = $"Progress: {message.Ratio.ToString("P2")}";
+        Console.WriteLine(progress);
+        LogToUi(progress);
+
+        // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
+        if (message.Ratio == 1)
+        {
+            progress = $"Progress: 100%";
+
+            // Get a bufferPointer from C WASM to C#
+            var res = await ffMpeg.ReadFile(outputFile);
+
+            // Generate a URL from the file bufferPointer
+            audioOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "audio/mp3");
+
+            // Download the file
+            if (download)
+            { 
+                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "audio/mp3");
+            }
+
+            // Rerender DOM
+            StateHasChanged();
+        }
+    }
+
+    private void LogToConsole(Logs message)
+    {
+        var logMessage = $"{message.Type} {message.Message}";
+        Console.WriteLine(logMessage);
+        LogToUi(logMessage);
+    }
+
+    private void LogToUi(string message)
+    {
+        logMessages += $"{message}\r\n";
+        // Rerender DOM
+        StateHasChanged();
+    }
+}
