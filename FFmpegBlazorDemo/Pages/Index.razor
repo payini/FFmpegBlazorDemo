@@ -4,12 +4,16 @@
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
-<PageTitle>Convert to MP3</PageTitle>
+<PageTitle>Convert MP4 to MP3</PageTitle>
 
 <h1>Convert MP4 to MP3</h1>
-
-<InputFile OnChange="LoadVideoFile" />
+Extract audio from an MP4 video, and create an MP3 audio file.
 <br />
+<br />
+<div>
+    <label for="videoFile">Video file:</label>
+    <InputFile id="videoFile" OnChange="LoadVideoFile" />
+</div>
 <br />
 <video width="300" height="200" autoplay controls src="@videoInputUrl" />
 <br />
@@ -17,13 +21,13 @@
 <input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
 <br />
 <br />
-<button class="btn btn-primary" @onclick="Process">Convert to MP3</button>
+<button class="btn btn-primary" @onclick="Process">Convert MP4 to MP3</button>
 <br />
 <br />
 <audio controls src="@audioOutputUrl" />
 
 <br />
-<Logger LogMessages="@logMessages" Progress="@progress" Rows="35"/>
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="35"/>
 
 @code
 {
@@ -32,7 +36,7 @@
     string? videoInputUrl = string.Empty;
     string audioOutputUrl = string.Empty;
     string logMessages = string.Empty;
-    string progress = string.Empty;
+    string progressMessage = string.Empty;
     bool download = false;
     const string inputFile = "input.mp4";
     const string outputFile = "output.mp3";
@@ -55,7 +59,7 @@
     {
         // Clear logs and progress
         logMessages = string.Empty;
-        progress = string.Empty;
+        progressMessage = string.Empty;
 
         // Get first file from input selection
         var file = v.GetMultipleFiles()[0];
@@ -97,14 +101,17 @@
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        progress = $"Progress: {message.Ratio.ToString("P2")}";
-        Console.WriteLine(progress);
-        LogToUi(progress);
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
 
         // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
         if (message.Ratio == 1)
         {
-            progress = $"Progress: 100%";
+            progressMessage = $"Progress: 100%";
 
             // Get a bufferPointer from C WASM to C#
             var res = await ffMpeg!.ReadFile(outputFile);

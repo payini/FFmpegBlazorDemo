@@ -6,18 +6,23 @@
 <PageTitle>Concatenate Videos</PageTitle>
 
 <h1>Concatenate Videos</h1>
+Concatenate two videos into one video.
+<br />
+<br />
 
 <div class="row">
     <div class="col-3">
-        <InputFile OnChange="LoadVideoFile1" />
-        <br />
+        <div>            <label for="videoFile1">Video file 1:</label>
+            <InputFile id="videoFile1" OnChange="LoadVideoFile1" />
+        </div>
         <br />    
         <video width="300" height="200" autoplay controls src="@videoInputUrl1" />
     </div>
 
     <div class="col-9" style="text-align:left;">
-        <InputFile OnChange="LoadVideoFile2" />
-        <br />
+        <div>            <label for="videoFile2">Video file 2:</label>
+            <InputFile id="videoFile2" OnChange="LoadVideoFile2" />
+        </div>
         <br />
         <video width="300" height="200" autoplay controls src="@videoInputUrl2" />
     </div>
@@ -33,7 +38,7 @@
 <video width="300" height="200" autoplay controls src="@videoOutputUrl" />
 <br />
 <br />
-<Logger LogMessages="@logMessages" Progress="@progress" Rows="20" />
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="25" />
 
 @code
 {
@@ -44,7 +49,7 @@
     string videoInputUrl2 = string.Empty;
     string videoOutputUrl = string.Empty;
     string logMessages = string.Empty;
-    string progress = string.Empty;
+    string progressMessage = string.Empty;
     bool download = false;
     const string inputFile1 = "videoInput1.mp4";
     const string inputFile2 = "videoInput2.mp4";
@@ -65,7 +70,7 @@
     {
         // Clear logs and progress
         logMessages = string.Empty;
-        progress = string.Empty;
+        progressMessage = string.Empty;
 
         // Unlink files if previously called
         if (ffMpeg != null)
@@ -144,15 +149,17 @@
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 100 : message.Ratio;
-        progress = $"Progress: {progressRatio.ToString("P2")}";
-        Console.WriteLine(progress);
-        LogToUi(progress);
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
 
         // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
         if (message.Ratio == 1)
         {
-            progress = $"Progress: 100%";
+            progressMessage = $"Progress: 100%";
 
             // Get a bufferPointer from C WASM to C#
             var res = await ffMpeg!.ReadFile(outputFile);
