@@ -131,7 +131,7 @@ Add a **Logger.razor** component to the **Shared** folder, with the following co
 ```razor
 <div style="position: absolute; bottom: 0px;">
     <h3>Logs @Progress</h3>
-    <textarea rows="@Rows" cols="300" style="font-family:Lucida Sans Typewriter; font-size:12px;">
+    <textarea rows="@Rows" cols="300" readonly style="font-family:Lucida Sans Typewriter; font-size:12px;">
         @LogMessages
     </textarea>
 </div>
@@ -246,7 +246,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
         await ffMpeg.Run("-i", inputFile, outputFile);
 
         // Delete in-memory file
-        // ffMpeg.UnlinkFile(inputFile);
+        ffMpeg.UnlinkFile(inputFile);
     }
 
     private async void ProgressChange(Progress message)
@@ -367,7 +367,6 @@ For simplicity, I will create an independent demo that will work on it's own, so
 ```razor
 @page "/concatenate"
 @using FFmpegBlazor
-@inject IJSRuntime Runtime
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
@@ -418,17 +417,15 @@ For simplicity, I will create an independent demo that will work on it's own, so
     const string inputFile2 = "videoInput2.mp4";
     const string outputFile = "output.mp4";
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         // Wire-up events
-        if (FFmpegFactory.Runtime == null)
+        if (FFmpegFactory.Runtime != null)
         {
             FFmpegFactory.Logger += LogToConsole;
             FFmpegFactory.Progress += ProgressChange;
         }
-
-        // Initialize Library
-        await FFmpegFactory.Init(Runtime);
+        base.OnInitialized();
     }
 
     private async void LoadVideoFile1(InputFileChangeEventArgs v)
@@ -436,6 +433,22 @@ For simplicity, I will create an independent demo that will work on it's own, so
         // Clear logs and progress
         logMessages = string.Empty;
         progress = string.Empty;
+
+        // Unlink files if previously called
+        if (ffMpeg != null)
+        {
+            if (videoInputUrl1 != string.Empty)
+            {
+                videoInputUrl1 = "";
+                ffMpeg.UnlinkFile(inputFile1);
+            }
+
+            if (inputFile2 != string.Empty)
+            {
+                videoInputUrl2 = "";
+                ffMpeg.UnlinkFile(inputFile2);
+            }
+        }
 
         // Get first file from input selection
         var file = v.GetMultipleFiles()[0];
@@ -491,14 +504,15 @@ For simplicity, I will create an independent demo that will work on it's own, so
         await ffMpeg.Run("-i", inputFile1, "-i", inputFile2, "-filter_complex", "concat=n=2:v=1:a=0", "-vn", "-y", outputFile);
 
         // Delete in-memory files
-        //ffMpeg.UnlinkFile(inputFile1);
-        //ffMpeg.UnlinkFile(inputFile2);
+        ffMpeg.UnlinkFile(inputFile1);
+        ffMpeg.UnlinkFile(inputFile2);
     }
 
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        progress = $"Progress: {message.Ratio.ToString("P2")}";
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 100 : message.Ratio;
+        progress = $"Progress: {progressRatio.ToString("P2")}";
         Console.WriteLine(progress);
         LogToUi(progress);
 
