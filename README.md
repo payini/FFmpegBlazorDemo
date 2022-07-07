@@ -9,7 +9,8 @@
     - [FFmpegBlazor](#ffmpegblazor)
   - [Demo](#demo)
     - [Create a Blazor WebAssembly Application](#create-a-blazor-webassembly-application)
-    - [Logs Component](#logs-component)
+    - [Logger Component](#logger-component)
+    - [Concatenate Videos](#concatenate-videos)
   - [Summary](#summary)
   - [Complete Code](#complete-code)
   - [Resources](#resources)
@@ -121,9 +122,9 @@ Now we are ready to give it a try!
 
 The first demo we are going to do, is to replicate the sample code in the NuGet package docs, with some enhancements.
 
-### Logs Component
+### Logger Component
 
-The sample demo in the NuGet package docs, is logging data to the browser's console logs, let's create a `Logs` component, so we can see the logs right on the page, as well as as progress indicator.
+The sample demo in the NuGet package docs, is logging data to the browser's console logs, let's create a `Logger` component, so we can see the logs right on the page, as well as as progress indicator.
 
 Add a **Logger.razor** component to the **Shared** folder, with the following code:
 
@@ -136,7 +137,6 @@ Add a **Logger.razor** component to the **Shared** folder, with the following co
 </div>
 
 @code {
-
     [Parameter]
     public int Rows { get; set; } = 20;
 
@@ -157,6 +157,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
 @using FFmpegBlazor
 @inject IJSRuntime Runtime
 @using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
 
 <PageTitle>Convert to MP3</PageTitle>
 
@@ -181,9 +182,9 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
 
 @code
 {
-    FFMPEG ffMpeg;
-    byte[] videoBuffer;
-    string videoInputUrl = string.Empty;
+    FFMPEG? ffMpeg;
+    byte[]? videoBuffer;
+    string? videoInputUrl = string.Empty;
     string audioOutputUrl = string.Empty;
     string logMessages = string.Empty;
     string progress = string.Empty;
@@ -204,13 +205,14 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
         await FFmpegFactory.Init(Runtime);
     }
 
+
     private async void LoadVideoFile(InputFileChangeEventArgs v)
     {
         // Clear logs and progress
         logMessages = string.Empty;
         progress = string.Empty;
-        
-        // Get fist file from input selection
+
+        // Get first file from input selection
         var file = v.GetMultipleFiles()[0];
 
         // Read all bytes
@@ -244,7 +246,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
         await ffMpeg.Run("-i", inputFile, outputFile);
 
         // Delete in-memory file
-        // ff.UnlinkFile(inputFile);
+        // ffMpeg.UnlinkFile(inputFile);
     }
 
     private async void ProgressChange(Progress message)
@@ -260,7 +262,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
             progress = $"Progress: 100%";
 
             // Get a bufferPointer from C WASM to C#
-            var res = await ffMpeg.ReadFile(outputFile);
+            var res = await ffMpeg!.ReadFile(outputFile);
 
             // Generate a URL from the file bufferPointer
             audioOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "audio/mp3");
@@ -289,6 +291,12 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
         // Rerender DOM
         StateHasChanged();
     }
+
+    public void Dispose()
+    {
+        FFmpegFactory.Logger -= LogToConsole;
+        FFmpegFactory.Progress -= ProgressChange;
+    }
 }
 ```
 
@@ -300,7 +308,7 @@ Most of the code has comments, but some of the most important pieces are:
 - Creating an instance of `FFmpeg` with `ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });`.
 - Executing `FFmpeg` functions like `WriteFile` and `Run`.
 
->:blue_book: With `ffMpeg.Run` we can potentially run any `FFmpeg` arguments, which makes it very powerful. Refer to the official `FFmpeg` documentation [here](https://ffmpeg.org/ffmpeg.html) for more information.
+>:blue_book: With `ffMpeg.Run` we can potentially run any `FFmpeg` arguments, which makes `FFmpegBlazor` very powerful. Refer to the official `FFmpeg` documentation [here](https://ffmpeg.org/ffmpeg.html) for more information.
 
 Let's get rid of **Pages/FetchData.razor** and, **Shared/SurveyPrompt.razor**, we are not going to need them.
 
@@ -338,6 +346,222 @@ Update the **Pages/NavMenu.razor** with this code:
 }
 ```
 
+Now let's run the app. You will be presented with this:
+
+![Convert MP4 to MP3](images/0e1f2045861d4c454a4db75b40d3431806abd338a4d2a5e51395ec9ac4607fad.png)  
+
+Click on `Choose File` to select an MP4 video file. The file will load and play on the Video player. You have the option to just convert the file to MP3, or convert and download by checking the `Download Output File` box, let's check the box and click on `Convert to MP3`.
+
+You will see the log entries, progress completed, the downloaded **output.mp3** file, and the Audio player ready to play the MP3 file.
+
+![Convert MP4 to MP3 Results](images/22963913f686e234678bc699749cce744f8ae7922a5082fc6d65d26207ad21e9.png)  
+
+So, what else can we do with `FFmpegBlazor`? How about concatenating two videos together? Let's do that now.
+
+### Concatenate Videos
+
+In this demo, we are going to take any two random videos, and concatenate them together, one after the other one.
+
+For simplicity, I will create an independent demo that will work on it's own, so let's duplicate **Pages/index.razor**, and call the new file **Pages/Concatenate.razor** and replace the code with this:
+
+```razor
+@page "/concatenate"
+@using FFmpegBlazor
+@inject IJSRuntime Runtime
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+<PageTitle>Concatenate Videos</PageTitle>
+
+<h1>Concatenate Videos</h1>
+
+<div class="row">
+    <div class="col-3">
+        <InputFile OnChange="LoadVideoFile1" />
+        <br />
+        <br />    
+        <video width="300" height="200" autoplay controls src="@videoInputUrl1" />
+    </div>
+
+    <div class="col-9" style="text-align:left;">
+        <InputFile OnChange="LoadVideoFile2" />
+        <br />
+        <br />
+        <video width="300" height="200" autoplay controls src="@videoInputUrl2" />
+    </div>
+</div>
+<br />
+<br />
+<input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
+<br />
+<br />
+<button class="btn btn-primary" @onclick="Process">Concatenate Videos</button>
+<br />
+<br />
+<video width="300" height="200" autoplay controls src="@videoOutputUrl" />
+<br />
+<br />
+<Logger LogMessages="@logMessages" Progress="@progress" Rows="20" />
+
+@code
+{
+    FFMPEG? ffMpeg;
+    byte[]? videoBuffer1;
+    byte[]? videoBuffer2;
+    string videoInputUrl1 = string.Empty;
+    string videoInputUrl2 = string.Empty;
+    string videoOutputUrl = string.Empty;
+    string logMessages = string.Empty;
+    string progress = string.Empty;
+    bool download = false;
+    const string inputFile1 = "videoInput1.mp4";
+    const string inputFile2 = "videoInput2.mp4";
+    const string outputFile = "output.mp4";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Wire-up events
+        if (FFmpegFactory.Runtime == null)
+        {
+            FFmpegFactory.Logger += LogToConsole;
+            FFmpegFactory.Progress += ProgressChange;
+        }
+
+        // Initialize Library
+        await FFmpegFactory.Init(Runtime);
+    }
+
+    private async void LoadVideoFile1(InputFileChangeEventArgs v)
+    {
+        // Clear logs and progress
+        logMessages = string.Empty;
+        progress = string.Empty;
+
+        // Get first file from input selection
+        var file = v.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        videoBuffer1 = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(videoBuffer1);
+
+        // Create a video link from the buffer, so that video can be played
+        videoInputUrl1 = FFmpegFactory.CreateURLFromBuffer(videoBuffer1, inputFile1, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void LoadVideoFile2(InputFileChangeEventArgs v)
+    {
+        // Get first file from input selection
+        var file = v.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        videoBuffer2 = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(videoBuffer2);
+
+        // Create a video link from the buffer, so that video can be played
+        videoInputUrl2 = FFmpegFactory.CreateURLFromBuffer(videoBuffer2, inputFile2, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void Process()
+    {
+        // Create an instance of FFmpeg
+        ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });
+
+        // Download all dependencies from the CDN
+        await ffMpeg.Load();
+
+        if (!ffMpeg.IsLoaded) return;
+
+        // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
+        ffMpeg.WriteFile(inputFile1, videoBuffer1);
+        ffMpeg.WriteFile(inputFile2, videoBuffer2);
+
+        // Pass CLI argument here equivalent to ffmpeg -i inputFile1.mp4 -i inputFile2.mp4 outputFile.mp3 -filter_complex concat=n=2:v=1:a=0 -vn -y output.mp4
+        await ffMpeg.Run("-i", inputFile1, "-i", inputFile2, "-filter_complex", "concat=n=2:v=1:a=0", "-vn", "-y", outputFile);
+
+        // Delete in-memory files
+        //ffMpeg.UnlinkFile(inputFile1);
+        //ffMpeg.UnlinkFile(inputFile2);
+    }
+
+    private async void ProgressChange(Progress message)
+    {
+        // Display progress % (0-1)
+        progress = $"Progress: {message.Ratio.ToString("P2")}";
+        Console.WriteLine(progress);
+        LogToUi(progress);
+
+        // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
+        if (message.Ratio == 1)
+        {
+            progress = $"Progress: 100%";
+
+            // Get a bufferPointer from C WASM to C#
+            var res = await ffMpeg!.ReadFile(outputFile);
+
+            // Generate a URL from the file bufferPointer
+            videoOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "video/mp4");
+
+            // Download the file
+            if (download)
+            {
+                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "video/mp4");
+            }
+
+            // Rerender DOM
+            StateHasChanged();
+        }
+    }
+
+    private void LogToConsole(Logs message)
+    {
+        var logMessage = $"{message.Type} {message.Message}";
+        Console.WriteLine(logMessage);
+        LogToUi(logMessage);
+    }
+
+    private void LogToUi(string message)
+    {
+        logMessages += $"{message}\r\n";
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        FFmpegFactory.Logger -= LogToConsole;
+        FFmpegFactory.Progress -= ProgressChange;
+    }
+}
+```
+
+Add a new `NavLink` to the **NavMenu.razor** file, below the `Convert to MP3` button.
+
+```razor
+<div class="nav-item px-3">
+   <NavLink class="nav-link" href="concatenate">
+       <span class="oi oi-video" aria-hidden="true"></span> Concatenate Videos
+   </NavLink>
+</div>
+```
+
+And run the application.
+
+After selecting two videos, check the `Download Output File` box, and clicking the `Concatenate Videos` button, you will be able to see the concatenated video on the third video component, as well in the downloads.
+
+![Concatenate Videos Demo](images/2cfb4735386af8197a6811adb4b971dbebbca495388487e0882fba94c539ac7a.png)  
+
 ## Summary
 
 For more information about Blazor, check the links in the resources section below.
@@ -356,4 +580,4 @@ The complete code for this demo can be found in the link below.
 | Download .NET                    | <https://dotnet.microsoft.com/en-us/download>                              |
 | FFmpegBlazor                     | <https://github.com/sps014/FFmpegBlazor>                                   |
 | FFmpegBlazor NuGet Package       | <https://www.nuget.org/packages/FFmpegBlazor/>                             |
-|FFmpeg Documentation|<https://ffmpeg.org/ffmpeg.html>|
+| FFmpeg Documentation             | <https://ffmpeg.org/ffmpeg.html>                                           |
