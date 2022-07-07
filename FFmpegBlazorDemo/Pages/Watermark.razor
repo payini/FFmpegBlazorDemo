@@ -26,6 +26,7 @@ Add a watermark to a video.
 <video width="300" height="200" autoplay controls src="@videoInputUrl" />
 <br />
 <br />
+<input type="checkbox" @bind-value="@centerWatermark" />&nbsp;Center Watermark&nbsp;&nbsp;
 <input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
 <br />
 <br />
@@ -47,6 +48,7 @@ Add a watermark to a video.
     string videoOutputUrl = string.Empty;
     string logMessages = string.Empty;
     string progressMessage = string.Empty;
+    bool centerWatermark = false;
     bool download = false;
     const string inputImageFile = "input.png";
     const string inputVideoFile = "input.mp4";
@@ -120,7 +122,8 @@ Add a watermark to a video.
         ffMpeg.WriteFile(inputVideoFile, videoBuffer);
 
         // Pass CLI argument here equivalent to ffmpeg -i input.mp4 -i logo.png -filter_complex "overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2" -codec:a copy output.mp4
-        await ffMpeg.Run("-i", inputVideoFile, "-i", inputImageFile, "-filter_complex", "overlay=0:0", "-codec:a", "copy", outputFile);
+        var overlay = centerWatermark ? "(main_w-overlay_w)/2:(main_h-overlay_h)/2" : "0:0";
+        await ffMpeg.Run("-i", inputVideoFile, "-i", inputImageFile, "-filter_complex", $"overlay={overlay}", "-codec:a", "copy", outputFile);
 
         // Delete in-memory file
         ffMpeg.UnlinkFile(inputImageFile);
