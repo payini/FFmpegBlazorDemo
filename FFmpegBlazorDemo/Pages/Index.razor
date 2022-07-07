@@ -91,7 +91,7 @@
         await ffMpeg.Run("-i", inputFile, outputFile);
 
         // Delete in-memory file
-        // ffMpeg.UnlinkFile(inputFile);
+        ffMpeg.UnlinkFile(inputFile);
     }
 
     private async void ProgressChange(Progress message)
