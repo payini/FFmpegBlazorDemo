@@ -1,6 +1,5 @@
 ﻿@page "/concatenate"
 @using FFmpegBlazor
-@inject IJSRuntime Runtime
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
@@ -51,17 +50,15 @@
     const string inputFile2 = "videoInput2.mp4";
     const string outputFile = "output.mp4";
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         // Wire-up events
-        if (FFmpegFactory.Runtime == null)
+        if (FFmpegFactory.Runtime != null)
         {
             FFmpegFactory.Logger += LogToConsole;
             FFmpegFactory.Progress += ProgressChange;
         }
-
-        // Initialize Library
-        await FFmpegFactory.Init(Runtime);
+        base.OnInitialized();
     }
 
     private async void LoadVideoFile1(InputFileChangeEventArgs v)
@@ -69,6 +66,22 @@
         // Clear logs and progress
         logMessages = string.Empty;
         progress = string.Empty;
+
+        // Unlink files if previously called
+        if (ffMpeg != null)
+        {
+            if (videoInputUrl1 != string.Empty)
+            {
+                videoInputUrl1 = "";
+                ffMpeg.UnlinkFile(inputFile1);
+            }
+
+            if (inputFile2 != string.Empty)
+            {
+                videoInputUrl2 = "";
+                ffMpeg.UnlinkFile(inputFile2);
+            }
+        }
 
         // Get first file from input selection
         var file = v.GetMultipleFiles()[0];
@@ -124,14 +137,15 @@
         await ffMpeg.Run("-i", inputFile1, "-i", inputFile2, "-filter_complex", "concat=n=2:v=1:a=0", "-vn", "-y", outputFile);
 
         // Delete in-memory files
-        //ffMpeg.UnlinkFile(inputFile1);
-        //ffMpeg.UnlinkFile(inputFile2);
+        ffMpeg.UnlinkFile(inputFile1);
+        ffMpeg.UnlinkFile(inputFile2);
     }
 
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        progress = $"Progress: {message.Ratio.ToString("P2")}";
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 100 : message.Ratio;
+        progress = $"Progress: {progressRatio.ToString("P2")}";
         Console.WriteLine(progress);
         LogToUi(progress);
 
