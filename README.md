@@ -10,6 +10,8 @@
   - [Demo](#demo)
     - [Create a Blazor WebAssembly Application](#create-a-blazor-webassembly-application)
     - [Logger Component](#logger-component)
+    - [Create Video](#create-video)
+    - [Video Watermark](#video-watermark)
     - [Concatenate Videos](#concatenate-videos)
   - [Summary](#summary)
   - [Complete Code](#complete-code)
@@ -17,11 +19,15 @@
 
 ## Introduction
 
-In this episode, we are going to build a REPLACE_HERE.
+In this episode, we are going to build a Blazor WebAssembly application, and I am going to show you how to edit edit videos, and audio using `FFmpegBlazor`.
 
-End results will look like this:
+`FFmpegBlazor` provides ability to utilize `ffmpeg.wasm` from a Blazor WebAssembly application using C#, to leverage all the benefits of `ffmpeg`.
 
-![Logs](images/REPLACE_HERE)
+At the end of this demo, we are going to be able to extract the audio track of an MP4 video and create an MP3 audio file, create an MP4 video from a single image, and an audio track, add a watermark to a video, and concatenate two videos into one.
+
+Stay tuned, the end results will look like this:
+
+![Demo Application](images/7e4f6c55cc791c18799a218a1cb0842186c83f265124da67d79e2155e760ebef.png)  
 
 Let's get to it.
 
@@ -120,7 +126,7 @@ To:
 
 Now we are ready to give it a try!
 
-The first demo we are going to do, is to replicate the sample code in the NuGet package docs, with some enhancements.
+The first demo we are going to do, is to replicate the sample code in the NuGet package docs, with some enhancements. We are going to extract the audio from an MP4 video, and create an MP3 audio file.
 
 ### Logger Component
 
@@ -159,12 +165,16 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
-<PageTitle>Convert to MP3</PageTitle>
+<PageTitle>Convert MP4 to MP3</PageTitle>
 
 <h1>Convert MP4 to MP3</h1>
-
-<InputFile OnChange="LoadVideoFile" />
+Extract audio from an MP4 video, and create an MP3 audio file.
 <br />
+<br />
+<div>
+    <label for="videoFile">Video file:</label>
+    <InputFile id="videoFile" OnChange="LoadVideoFile" />
+</div>
 <br />
 <video width="300" height="200" autoplay controls src="@videoInputUrl" />
 <br />
@@ -172,13 +182,13 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
 <input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
 <br />
 <br />
-<button class="btn btn-primary" @onclick="Process">Convert to MP3</button>
+<button class="btn btn-primary" @onclick="Process">Convert MP4 to MP3</button>
 <br />
 <br />
 <audio controls src="@audioOutputUrl" />
 
 <br />
-<Logger LogMessages="@logMessages" Progress="@progress" Rows="35"/>
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="35"/>
 
 @code
 {
@@ -187,7 +197,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
     string? videoInputUrl = string.Empty;
     string audioOutputUrl = string.Empty;
     string logMessages = string.Empty;
-    string progress = string.Empty;
+    string progressMessage = string.Empty;
     bool download = false;
     const string inputFile = "input.mp4";
     const string outputFile = "output.mp3";
@@ -210,7 +220,7 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
     {
         // Clear logs and progress
         logMessages = string.Empty;
-        progress = string.Empty;
+        progressMessage = string.Empty;
 
         // Get first file from input selection
         var file = v.GetMultipleFiles()[0];
@@ -252,14 +262,17 @@ Now, go to the **Pages/index.razor** page and replace the code with this code:
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        progress = $"Progress: {message.Ratio.ToString("P2")}";
-        Console.WriteLine(progress);
-        LogToUi(progress);
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
 
         // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
         if (message.Ratio == 1)
         {
-            progress = $"Progress: 100%";
+            progressMessage = $"Progress: 100%";
 
             // Get a bufferPointer from C WASM to C#
             var res = await ffMpeg!.ReadFile(outputFile);
@@ -328,7 +341,7 @@ Update the **Pages/NavMenu.razor** with this code:
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-musical-note" aria-hidden="true"></span> Convert to MP3
+                <span class="oi oi-musical-note" aria-hidden="true"></span> Convert MP4 to MP3
             </NavLink>
         </div>
     </nav>
@@ -348,21 +361,435 @@ Update the **Pages/NavMenu.razor** with this code:
 
 Now let's run the app. You will be presented with this:
 
-![Convert MP4 to MP3](images/0e1f2045861d4c454a4db75b40d3431806abd338a4d2a5e51395ec9ac4607fad.png)  
+![Convert MP4 to MP3](images/d1ef20383f96cf701a5bb62e3c40eba580d20bd2302141dee1f25437325be124.png)  
 
-Click on `Choose File` to select an MP4 video file. The file will load and play on the Video player. You have the option to just convert the file to MP3, or convert and download by checking the `Download Output File` box, let's check the box and click on `Convert to MP3`.
+Click on `Choose File` to select an MP4 video file. The file will load and play on the Video player. You have the option to just convert the file to MP3, or convert and download by checking the `Download Output File` box, let's check the box and click the `Convert MP4 to MP3` button.
 
 You will see the log entries, progress completed, the downloaded **output.mp3** file, and the Audio player ready to play the MP3 file.
 
-![Convert MP4 to MP3 Results](images/22963913f686e234678bc699749cce744f8ae7922a5082fc6d65d26207ad21e9.png)  
+![Convert MP4 to MP3 Results](images/b4df9f602d7fa16f71ace37e0ba36c16828aa5a4e4daec38dc7148f9537df875.png)  
 
-So, what else can we do with `FFmpegBlazor`? How about concatenating two videos together? Let's do that now.
+So, what else can we do with `FFmpegBlazor`? How about create a video from an image file and an audio file? Let's do that now.
+
+### Create Video
+
+In this demo, we are going to create an MP4 video file from a single image, and an audio file. The output video will last the same time as the audio file.
+
+Create a new **CreateMp4.razor** page and add the following code:
+
+```razor
+@page "/createMp4"
+@using FFmpegBlazor
+@inject IJSRuntime Runtime
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+<PageTitle>Create Video</PageTitle>
+
+<h1>Create Video</h1>
+Create an MP4 video file from a single image, and an audio file. The output video will last the same time as the audio file.
+<br />
+<br />
+<div>
+    <label for="imageFile">Image file:</label>
+    <InputFile id="imageFile" OnChange="LoadImageFile" />
+</div>
+<br />
+<img width="300" height="200" src="@imageInputUrl" />
+<br />
+<br />
+<div>
+    <label for="audioFile">Audio file:</label>
+    <InputFile id="audioFile" OnChange="LoadAudioFile" />
+</div>
+<br />
+<audio controls src="@audioInputUrl" />
+<br />
+<br />
+<input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
+<br />
+<br />
+<button class="btn btn-primary" @onclick="Process">Create Video</button>
+<br />
+<br />
+<video width="300" height="200" autoplay controls src="@videoOutputUrl" />
+<br />
+<br />
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="19"/>
+
+@code
+{
+    FFMPEG? ffMpeg;
+    byte[]? audioBuffer;
+    byte[]? imageBuffer;
+    string? imageInputUrl = string.Empty;
+    string? audioInputUrl = string.Empty;
+    string videoOutputUrl = string.Empty;
+    string logMessages = string.Empty;
+    string progressMessage = string.Empty;
+    bool download = false;
+    const string inputImageFile = "input.png";
+    const string inputAudioFile = "input.mp3";
+    const string outputFile = "output.mp4";
+
+    protected override void OnInitialized()
+    {
+        // Wire-up events
+        if (FFmpegFactory.Runtime != null)
+        {
+            FFmpegFactory.Logger += LogToConsole;
+            FFmpegFactory.Progress += ProgressChange;
+        }
+        base.OnInitialized();
+    }
+
+    private async void LoadImageFile(InputFileChangeEventArgs i)
+    {
+        // Clear logs and progress
+        logMessages = string.Empty;
+        progressMessage = string.Empty;
+
+        // Get first file from input selection
+        var file = i.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        imageBuffer = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(imageBuffer);
+
+        // Create a video link from the buffer, so that video can be played
+        imageInputUrl = FFmpegFactory.CreateURLFromBuffer(imageBuffer, inputImageFile, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void LoadAudioFile(InputFileChangeEventArgs a)
+    {
+        // Get first file from input selection
+        var file = a.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        audioBuffer = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(audioBuffer);
+
+        // Create a video link from the buffer, so that video can be played
+        audioInputUrl = FFmpegFactory.CreateURLFromBuffer(audioBuffer, inputAudioFile, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void Process()
+    {
+        // Create an instance of FFmpeg
+        ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });
+
+        // Download all dependencies from the CDN
+        await ffMpeg.Load();
+
+        if (!ffMpeg.IsLoaded) return;
+
+        // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
+        ffMpeg.WriteFile(inputImageFile, imageBuffer);
+        ffMpeg.WriteFile(inputAudioFile, audioBuffer);
+
+        // Pass CLI argument here equivalent to ffmpeg -i image.png -i sound1.mp3 -r 30 -s 1280x720 -preset ultrafast -crf 25 movie.mp4
+        await ffMpeg.Run("-i", inputImageFile, "-i", inputAudioFile, "-r", "30", "-s", "1280x720", "-preset", "ultrafast", "-crf", "25", outputFile);
+
+        // Delete in-memory file
+        ffMpeg.UnlinkFile(inputImageFile);
+        ffMpeg.UnlinkFile(inputAudioFile);
+    }
+
+    private async void ProgressChange(Progress message)
+    {
+        // Display progress % (0-1)
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
+
+        // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
+        if (message.Ratio == 1)
+        {
+            progressMessage = $"Progress: 100%";
+
+            // Get a bufferPointer from C WASM to C#
+            var res = await ffMpeg!.ReadFile(outputFile);
+
+            // Generate a URL from the file bufferPointer
+            videoOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "video/mp4");
+
+            // Download the file
+            if (download)
+            { 
+                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "video/mp4");
+            }
+
+            // Rerender DOM
+            StateHasChanged();
+        }
+    }
+
+    private void LogToConsole(Logs message)
+    {
+        var logMessage = $"{message.Type} {message.Message}";
+        Console.WriteLine(logMessage);
+        LogToUi(logMessage);
+    }
+
+    private void LogToUi(string message)
+    {
+        logMessages += $"{message}\r\n";
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        FFmpegFactory.Logger -= LogToConsole;
+        FFmpegFactory.Progress -= ProgressChange;
+    }
+}
+```
+
+Add the following `NavLink` code to the **Pages/NavMenu.razor** page, below the `Convert MP4 to MP3` section:
+
+```razor
+<div class="nav-item px-3">
+    <NavLink class="nav-link" href="createMp4">
+        <span class="oi oi-image" aria-hidden="true"></span> Create Video
+    </NavLink>
+</div>
+```
+
+Run the app, and go to `Create Video`. Provide an image, an audio file, check the `Download Output File` and press the `Create Video` button.
+
+You created a video based on an image, and an audio file now.
+
+![Create Video Results](images/3d9e68d428625843e16631a52c7df26a53dce6b6dfa2bc8544255e8bf5e2056e.png)  
+
+Now, let's add a watermark to an existing video.
+
+### Video Watermark
+
+Add a new **Watermark.razor** file and copy the following code:
+
+```razor
+@page "/watermark"
+@using FFmpegBlazor
+@inject IJSRuntime Runtime
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+<PageTitle>Video Watermark</PageTitle>
+
+<h1>Video Watermark</h1>
+Add a watermark to a video.
+<br />
+<br />
+<div>
+    <label for="imageFile">Image watermark file:</label>
+    <InputFile id="imageFile" OnChange="LoadImageFile" />
+</div>
+<br />
+<img width="300" height="200" src="@imageInputUrl" />
+<br />
+<br />
+<div>
+    <label for="videoFile">Video file:</label>
+    <InputFile id="videoFile" OnChange="LoadVideoFile" />
+</div>
+<br />
+<video width="300" height="200" autoplay controls src="@videoInputUrl" />
+<br />
+<br />
+<input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
+<br />
+<br />
+<button class="btn btn-primary" @onclick="Process">Create Video Watermark</button>
+<br />
+<br />
+<video width="300" height="200" autoplay controls src="@videoOutputUrl" />
+<br />
+<br />
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="12"/>
+
+@code
+{
+    FFMPEG? ffMpeg;
+    byte[]? imageBuffer;
+    byte[]? videoBuffer;
+    string? imageInputUrl = string.Empty;
+    string? videoInputUrl = string.Empty;
+    string videoOutputUrl = string.Empty;
+    string logMessages = string.Empty;
+    string progressMessage = string.Empty;
+    bool download = false;
+    const string inputImageFile = "input.png";
+    const string inputVideoFile = "input.mp4";
+    const string outputFile = "output.mp4";
+
+    protected override void OnInitialized()
+    {
+        // Wire-up events
+        if (FFmpegFactory.Runtime != null)
+        {
+            FFmpegFactory.Logger += LogToConsole;
+            FFmpegFactory.Progress += ProgressChange;
+        }
+        base.OnInitialized();
+    }
+
+    private async void LoadImageFile(InputFileChangeEventArgs i)
+    {
+        // Clear logs and progress
+        logMessages = string.Empty;
+        progressMessage = string.Empty;
+
+        // Get first file from input selection
+        var file = i.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        imageBuffer = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(imageBuffer);
+
+        // Create a video link from the buffer, so that video can be played
+        imageInputUrl = FFmpegFactory.CreateURLFromBuffer(imageBuffer, inputImageFile, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void LoadVideoFile(InputFileChangeEventArgs v)
+    {
+        // Get first file from input selection
+        var file = v.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        videoBuffer = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(videoBuffer);
+
+        // Create a video link from the buffer, so that video can be played
+        videoInputUrl = FFmpegFactory.CreateURLFromBuffer(videoBuffer, inputVideoFile, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void Process()
+    {
+        // Create an instance of FFmpeg
+        ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });
+
+        // Download all dependencies from the CDN
+        await ffMpeg.Load();
+
+        if (!ffMpeg.IsLoaded) return;
+
+        // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
+        ffMpeg.WriteFile(inputImageFile, imageBuffer);
+        ffMpeg.WriteFile(inputVideoFile, videoBuffer);
+
+        // Pass CLI argument here equivalent to ffmpeg -i input.mp4 -i logo.png -filter_complex "overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2" -codec:a copy output.mp4
+        await ffMpeg.Run("-i", inputVideoFile, "-i", inputImageFile, "-filter_complex", "overlay=0:0", "-codec:a", "copy", outputFile);
+
+        // Delete in-memory file
+        ffMpeg.UnlinkFile(inputImageFile);
+        ffMpeg.UnlinkFile(inputVideoFile);
+    }
+
+    private async void ProgressChange(Progress message)
+    {
+        // Display progress % (0-1)
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
+
+        // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
+        if (message.Ratio == 1)
+        {
+            progressMessage = $"Progress: 100%";
+
+            // Get a bufferPointer from C WASM to C#
+            var res = await ffMpeg!.ReadFile(outputFile);
+
+            // Generate a URL from the file bufferPointer
+            videoOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "video/mp4");
+
+            // Download the file
+            if (download)
+            { 
+                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "video/mp4");
+            }
+
+            // Rerender DOM
+            StateHasChanged();
+        }
+    }
+
+    private void LogToConsole(Logs message)
+    {
+        var logMessage = $"{message.Type} {message.Message}";
+        Console.WriteLine(logMessage);
+        LogToUi(logMessage);
+    }
+
+    private void LogToUi(string message)
+    {
+        logMessages += $"{message}\r\n";
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        FFmpegFactory.Logger -= LogToConsole;
+        FFmpegFactory.Progress -= ProgressChange;
+    }
+}
+```
+
+Add the following `NavLink` code to the **Pages/NavMenu.razor** page, below the `Create Video` section:
+
+```razor
+<div class="nav-item px-3">
+    <NavLink class="nav-link" href="createMp4">
+        <span class="oi oi-image" aria-hidden="true"></span> Video Watermark
+    </NavLink>
+</div>
+```
+
+Run the app, and go to `Video Watermark`. Provide an image, a video file, check the `Download Output File` and press the `Create Video Watermark` button.
+
+Now, you created added a watermark to a video.
+
+![Create Video Watermark](images/f253299609b79b76cdd88f00550d0668303cea4608d309f84d104cf2d467c1d3.png)  
+
+Finally, how about concatenating two videos together? Let's do that now.
 
 ### Concatenate Videos
 
 In this demo, we are going to take any two random videos, and concatenate them together, one after the other one.
 
-For simplicity, I will create an independent demo that will work on it's own, so let's duplicate **Pages/index.razor**, and call the new file **Pages/Concatenate.razor** and replace the code with this:
+Let's create **Pages/Concatenate.razor**, and add the following code:
 
 ```razor
 @page "/concatenate"
@@ -373,18 +800,25 @@ For simplicity, I will create an independent demo that will work on it's own, so
 <PageTitle>Concatenate Videos</PageTitle>
 
 <h1>Concatenate Videos</h1>
+Concatenate two videos into one video.
+<br />
+<br />
 
 <div class="row">
     <div class="col-3">
-        <InputFile OnChange="LoadVideoFile1" />
-        <br />
+        <div>
+            <label for="videoFile1">Video file 1:</label>
+            <InputFile id="videoFile1" OnChange="LoadVideoFile1" />
+        </div>
         <br />    
         <video width="300" height="200" autoplay controls src="@videoInputUrl1" />
     </div>
 
     <div class="col-9" style="text-align:left;">
-        <InputFile OnChange="LoadVideoFile2" />
-        <br />
+        <div>
+            <label for="videoFile2">Video file 2:</label>
+            <InputFile id="videoFile2" OnChange="LoadVideoFile2" />
+        </div>
         <br />
         <video width="300" height="200" autoplay controls src="@videoInputUrl2" />
     </div>
@@ -400,7 +834,7 @@ For simplicity, I will create an independent demo that will work on it's own, so
 <video width="300" height="200" autoplay controls src="@videoOutputUrl" />
 <br />
 <br />
-<Logger LogMessages="@logMessages" Progress="@progress" Rows="20" />
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="25" />
 
 @code
 {
@@ -411,7 +845,7 @@ For simplicity, I will create an independent demo that will work on it's own, so
     string videoInputUrl2 = string.Empty;
     string videoOutputUrl = string.Empty;
     string logMessages = string.Empty;
-    string progress = string.Empty;
+    string progressMessage = string.Empty;
     bool download = false;
     const string inputFile1 = "videoInput1.mp4";
     const string inputFile2 = "videoInput2.mp4";
@@ -432,7 +866,7 @@ For simplicity, I will create an independent demo that will work on it's own, so
     {
         // Clear logs and progress
         logMessages = string.Empty;
-        progress = string.Empty;
+        progressMessage = string.Empty;
 
         // Unlink files if previously called
         if (ffMpeg != null)
@@ -511,15 +945,17 @@ For simplicity, I will create an independent demo that will work on it's own, so
     private async void ProgressChange(Progress message)
     {
         // Display progress % (0-1)
-        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 100 : message.Ratio;
-        progress = $"Progress: {progressRatio.ToString("P2")}";
-        Console.WriteLine(progress);
-        LogToUi(progress);
+        // Cap progress as it doesn't always reports (0-1)
+        var progressRatio = message.Ratio <= 0 ? 0 : message.Ratio >= 100 ? 1 : message.Ratio;
+        progressMessage = $"Progress: {progressRatio.ToString("P2")}";
+
+        Console.WriteLine(progressMessage);
+        LogToUi(progressMessage);
 
         // If FFmpeg processing is complete (generate a media URL so that it can be played or alternatively download that file)
         if (message.Ratio == 1)
         {
-            progress = $"Progress: 100%";
+            progressMessage = $"Progress: 100%";
 
             // Get a bufferPointer from C WASM to C#
             var res = await ffMpeg!.ReadFile(outputFile);
@@ -560,25 +996,31 @@ For simplicity, I will create an independent demo that will work on it's own, so
 }
 ```
 
-Add a new `NavLink` to the **NavMenu.razor** file, below the `Convert to MP3` button.
+Add a new `NavLink` to the **Pages/NavMenu.razor** file, below the `Video Watermark` section.
 
 ```razor
 <div class="nav-item px-3">
-   <NavLink class="nav-link" href="concatenate">
-       <span class="oi oi-video" aria-hidden="true"></span> Concatenate Videos
-   </NavLink>
+    <NavLink class="nav-link" href="concatenate">
+        <span class="oi oi-video" aria-hidden="true"></span> Concatenate Videos
+    </NavLink>
 </div>
 ```
 
 And run the application.
 
-After selecting two videos, check the `Download Output File` box, and clicking the `Concatenate Videos` button, you will be able to see the concatenated video on the third video component, as well in the downloads.
+After selecting two videos, checking the `Download Output File` box, and clicking the `Concatenate Videos` button, you will be able to see the concatenated video on the third video component, as well in the downloads.
 
-![Concatenate Videos Demo](images/2cfb4735386af8197a6811adb4b971dbebbca495388487e0882fba94c539ac7a.png)  
+![Concatenate Videos Demo](images/a6af415a58bb17b999d1642f64c476cc30dbc3eee13693a7e57336111b94d37d.png)  
 
 ## Summary
 
-For more information about Blazor, check the links in the resources section below.
+In this episode, we saw how to edit edit videos, and audio using `FFmpegBlazor` in a Blazor WebAssembly application.
+
+We were able to extract the audio track of an MP4 video and create an MP3 audio file, create an MP4 video from a single image, and an audio track, add a watermark to a video, and concatenate two videos into one.
+
+Most importantly, we learned how easy we can leverage `FFmpegBlazor` to basically use any functionally provided by `FFmpeg` in a Blazor WebAssembly application. Now, that's powerful.
+
+For more information about `FFmpeg`, and `FFmpegBlazor`, check the links in the resources section below.
 
 ## Complete Code
 
