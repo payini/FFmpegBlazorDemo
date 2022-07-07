@@ -1,17 +1,17 @@
-﻿@page "/createMp4"
+﻿@page "/watermark"
 @using FFmpegBlazor
 @inject IJSRuntime Runtime
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
-<PageTitle>Create Video</PageTitle>
+<PageTitle>Video Watermark</PageTitle>
 
-<h1>Create Video</h1>
-Create an MP4 video file from a single image, and an audio file. The output video will last the same as the audio file.
+<h1>Video Watermark</h1>
+Add a watermark to a video.
 <br />
 <br />
 <div>
-    <label for="imageFile">Image file:</label>
+    <label for="imageFile">Image watermark file:</label>
     <InputFile id="imageFile" OnChange="LoadImageFile" />
 </div>
 <br />
@@ -19,37 +19,37 @@ Create an MP4 video file from a single image, and an audio file. The output vide
 <br />
 <br />
 <div>
-    <label for="audioFile">Audio file:</label>
-    <InputFile id="audioFile" OnChange="LoadAudioFile" />
+    <label for="videoFile">Video file:</label>
+    <InputFile id="videoFile" OnChange="LoadVideoFile" />
 </div>
 <br />
-<audio controls src="@audioInputUrl" />
+<video width="300" height="200" autoplay controls src="@videoInputUrl" />
 <br />
 <br />
 <input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
 <br />
 <br />
-<button class="btn btn-primary" @onclick="Process">Create Video</button>
+<button class="btn btn-primary" @onclick="Process">Create Video Watermark</button>
 <br />
 <br />
 <video width="300" height="200" autoplay controls src="@videoOutputUrl" />
 <br />
 <br />
-<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="19"/>
+<Logger LogMessages="@logMessages" Progress="@progressMessage" Rows="12"/>
 
 @code
 {
     FFMPEG? ffMpeg;
-    byte[]? audioBuffer;
     byte[]? imageBuffer;
+    byte[]? videoBuffer;
     string? imageInputUrl = string.Empty;
-    string? audioInputUrl = string.Empty;
+    string? videoInputUrl = string.Empty;
     string videoOutputUrl = string.Empty;
     string logMessages = string.Empty;
     string progressMessage = string.Empty;
     bool download = false;
     const string inputImageFile = "input.png";
-    const string inputAudioFile = "input.mp3";
+    const string inputVideoFile = "input.mp4";
     const string outputFile = "output.mp4";
 
     protected override void OnInitialized()
@@ -86,20 +86,20 @@ Create an MP4 video file from a single image, and an audio file. The output vide
         StateHasChanged();
     }
 
-    private async void LoadAudioFile(InputFileChangeEventArgs a)
+    private async void LoadVideoFile(InputFileChangeEventArgs v)
     {
         // Get first file from input selection
-        var file = a.GetMultipleFiles()[0];
+        var file = v.GetMultipleFiles()[0];
 
         // Read all bytes
         using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
-        audioBuffer = new byte[file.Size];
+        videoBuffer = new byte[file.Size];
 
         // Read all bytes
-        await stream.ReadAsync(audioBuffer);
+        await stream.ReadAsync(videoBuffer);
 
         // Create a video link from the buffer, so that video can be played
-        audioInputUrl = FFmpegFactory.CreateURLFromBuffer(audioBuffer, inputAudioFile, file.ContentType);
+        videoInputUrl = FFmpegFactory.CreateURLFromBuffer(videoBuffer, inputVideoFile, file.ContentType);
 
         // Rerender DOM
         StateHasChanged();
@@ -117,14 +117,14 @@ Create an MP4 video file from a single image, and an audio file. The output vide
 
         // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
         ffMpeg.WriteFile(inputImageFile, imageBuffer);
-        ffMpeg.WriteFile(inputAudioFile, audioBuffer);
+        ffMpeg.WriteFile(inputVideoFile, videoBuffer);
 
-        // Pass CLI argument here equivalent to ffmpeg -i image.png -i sound1.mp3 -r 30 -s 1280x720 -preset ultrafast -crf 25 movie.mp4
-        await ffMpeg.Run("-i", inputImageFile, "-i", inputAudioFile, "-r", "30", "-s", "1280x720", "-preset", "ultrafast", "-crf", "25", outputFile);
+        // Pass CLI argument here equivalent to ffmpeg -i input.mp4 -i logo.png -filter_complex "overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2" -codec:a copy output.mp4
+        await ffMpeg.Run("-i", inputVideoFile, "-i", inputImageFile, "-filter_complex", "overlay=0:0", "-codec:a", "copy", outputFile);
 
         // Delete in-memory file
         ffMpeg.UnlinkFile(inputImageFile);
-        ffMpeg.UnlinkFile(inputAudioFile);
+        ffMpeg.UnlinkFile(inputVideoFile);
     }
 
     private async void ProgressChange(Progress message)
