@@ -1,41 +1,55 @@
-﻿@page "/"
+﻿@page "/concatenate"
 @using FFmpegBlazor
 @inject IJSRuntime Runtime
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 
-<PageTitle>Convert to MP3</PageTitle>
+<PageTitle>Concatenate Videos</PageTitle>
 
-<h1>Convert MP4 to MP3</h1>
+<h1>Concatenate Videos</h1>
 
-<InputFile OnChange="LoadVideoFile" />
-<br />
-<br />
-<video width="300" height="200" autoplay controls src="@videoInputUrl" />
+<div class="row">
+    <div class="col-3">
+        <InputFile OnChange="LoadVideoFile1" />
+        <br />
+        <br />    
+        <video width="300" height="200" autoplay controls src="@videoInputUrl1" />
+    </div>
+
+    <div class="col-9" style="text-align:left;">
+        <InputFile OnChange="LoadVideoFile2" />
+        <br />
+        <br />
+        <video width="300" height="200" autoplay controls src="@videoInputUrl2" />
+    </div>
+</div>
 <br />
 <br />
 <input type="checkbox" @bind-value="@download" />&nbsp;Download Output File
 <br />
 <br />
-<button class="btn btn-primary" @onclick="Process">Convert to MP3</button>
+<button class="btn btn-primary" @onclick="Process">Concatenate Videos</button>
 <br />
 <br />
-<audio controls src="@audioOutputUrl" />
-
+<video width="300" height="200" autoplay controls src="@videoOutputUrl" />
 <br />
-<Logger LogMessages="@logMessages" Progress="@progress" Rows="35"/>
+<br />
+<Logger LogMessages="@logMessages" Progress="@progress" Rows="20" />
 
 @code
 {
     FFMPEG? ffMpeg;
-    byte[]? videoBuffer;
-    string? videoInputUrl = string.Empty;
-    string audioOutputUrl = string.Empty;
+    byte[]? videoBuffer1;
+    byte[]? videoBuffer2;
+    string videoInputUrl1 = string.Empty;
+    string videoInputUrl2 = string.Empty;
+    string videoOutputUrl = string.Empty;
     string logMessages = string.Empty;
     string progress = string.Empty;
     bool download = false;
-    const string inputFile = "input.mp4";
-    const string outputFile = "output.mp3";
+    const string inputFile1 = "videoInput1.mp4";
+    const string inputFile2 = "videoInput2.mp4";
+    const string outputFile = "output.mp4";
 
     protected override async Task OnInitializedAsync()
     {
@@ -50,8 +64,7 @@
         await FFmpegFactory.Init(Runtime);
     }
 
-
-    private async void LoadVideoFile(InputFileChangeEventArgs v)
+    private async void LoadVideoFile1(InputFileChangeEventArgs v)
     {
         // Clear logs and progress
         logMessages = string.Empty;
@@ -62,13 +75,32 @@
 
         // Read all bytes
         using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
-        videoBuffer = new byte[file.Size];
+        videoBuffer1 = new byte[file.Size];
 
         // Read all bytes
-        await stream.ReadAsync(videoBuffer);
+        await stream.ReadAsync(videoBuffer1);
 
         // Create a video link from the buffer, so that video can be played
-        videoInputUrl = FFmpegFactory.CreateURLFromBuffer(videoBuffer, inputFile, file.ContentType);
+        videoInputUrl1 = FFmpegFactory.CreateURLFromBuffer(videoBuffer1, inputFile1, file.ContentType);
+
+        // Rerender DOM
+        StateHasChanged();
+    }
+
+    private async void LoadVideoFile2(InputFileChangeEventArgs v)
+    {
+        // Get first file from input selection
+        var file = v.GetMultipleFiles()[0];
+
+        // Read all bytes
+        using var stream = file.OpenReadStream(100000000); //Max size for file that can be read
+        videoBuffer2 = new byte[file.Size];
+
+        // Read all bytes
+        await stream.ReadAsync(videoBuffer2);
+
+        // Create a video link from the buffer, so that video can be played
+        videoInputUrl2 = FFmpegFactory.CreateURLFromBuffer(videoBuffer2, inputFile2, file.ContentType);
 
         // Rerender DOM
         StateHasChanged();
@@ -85,13 +117,15 @@
         if (!ffMpeg.IsLoaded) return;
 
         // Write buffer to in-memory files (special emscripten files, FFmpeg only interact with this file)
-        ffMpeg.WriteFile(inputFile, videoBuffer);
+        ffMpeg.WriteFile(inputFile1, videoBuffer1);
+        ffMpeg.WriteFile(inputFile2, videoBuffer2);
 
-        // Pass CLI argument here equivalent to ffmpeg -i inputFile.mp4 outputFile.mp3
-        await ffMpeg.Run("-i", inputFile, outputFile);
+        // Pass CLI argument here equivalent to ffmpeg -i inputFile1.mp4 -i inputFile2.mp4 outputFile.mp3 -filter_complex concat=n=2:v=1:a=0 -vn -y output.mp4
+        await ffMpeg.Run("-i", inputFile1, "-i", inputFile2, "-filter_complex", "concat=n=2:v=1:a=0", "-vn", "-y", outputFile);
 
-        // Delete in-memory file
-        // ffMpeg.UnlinkFile(inputFile);
+        // Delete in-memory files
+        //ffMpeg.UnlinkFile(inputFile1);
+        //ffMpeg.UnlinkFile(inputFile2);
     }
 
     private async void ProgressChange(Progress message)
@@ -110,12 +144,12 @@
             var res = await ffMpeg!.ReadFile(outputFile);
 
             // Generate a URL from the file bufferPointer
-            audioOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "audio/mp3");
+            videoOutputUrl = FFmpegFactory.CreateURLFromBuffer(res, outputFile, "video/mp4");
 
             // Download the file
             if (download)
-            { 
-                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "audio/mp3");
+            {
+                FFmpegFactory.DownloadBufferAsFile(res, outputFile, "video/mp4");
             }
 
             // Rerender DOM
