@@ -10,7 +10,7 @@
   - [Demo](#demo)
     - [Create a Blazor WebAssembly Application](#create-a-blazor-webassembly-application)
     - [Convert MP4 to MP3](#convert-mp4-to-mp3)
-    - [Logger Component](#logger-component)
+      - [Logger Component](#logger-component)
     - [Create Video](#create-video)
     - [Video Watermark](#video-watermark)
     - [Concatenate Videos](#concatenate-videos)
@@ -20,7 +20,7 @@
 
 ## Introduction
 
-In this episode, we are going to build a Blazor WebAssembly application, and I am going to show you how to edit edit videos, and audio using `FFmpegBlazor`.
+In this episode, we are going to build a Blazor WebAssembly application, and I am going to show you how to edit videos, and audio using `FFmpegBlazor`.
 
 `FFmpegBlazor` provides the ability to utilize `ffmpeg.wasm` from a Blazor WebAssembly application using C#, to leverage all the benefits of `ffmpeg`.
 
@@ -84,11 +84,11 @@ Then, when we actually use the library, the 25 MB core FFmpeg WASM library will 
 
 ![Core FFmpeg WASM library](images/8c5560554a5c4b97a67f8ca4d2106f1095d902af61696103b615647a0b218600.png)  
 
-As you can see, the 25 MB just took 177 ms to download on my machine, so do not get discourage by that.
+As you can see, the 25 MB just took 177 ms to download on my machine, so do not get discouraged by that.
 
 So, let's give it a try!
 
-First thing we have to do, after adding the package, is to implement a workaround, which will not be needed after .NET 7, once Multi-threading support becomes available in WASM.
+First thing we have to do, after adding the package, is to implement a workaround, which it will not be needed after .NET 7, once Multi-threading support becomes available in WASM.
 
 This is to avoid a `SharedArrayBuffer not defined` exception that you will get otherwise.
 
@@ -135,7 +135,7 @@ Now we are ready to give it a try!
 
 The first demo we are going to do, is to replicate the sample code in the NuGet package docs, with some enhancements. We are going to extract the audio from an MP4 video, and create an MP3 audio file.
 
-### Logger Component
+#### Logger Component
 
 The sample demo in the NuGet package docs, is logging data to the browser's console logs, let's create a `Logger` component, so we can see the logs right on the page, as well as as progress indicator.
 
@@ -328,7 +328,7 @@ Most of the code has comments, but some of the most important pieces are:
 - Creating an instance of `FFmpeg` with `ffMpeg = FFmpegFactory.CreateFFmpeg(new FFmpegConfig() { Log = true });`.
 - Executing `FFmpeg` functions like `WriteFile` and `Run`.
 
->:blue_book: With `ffMpeg.Run` we can potentially run any `FFmpeg` arguments, which makes `FFmpegBlazor` very powerful. Refer to the official `FFmpeg` documentation [here](https://ffmpeg.org/ffmpeg.html) for more information.
+>:blue_book: With `ffMpeg.Run` we can potentially run any `FFmpeg` arguments available, which makes `FFmpegBlazor` very powerful. Refer to the official `FFmpeg` documentation [here](https://ffmpeg.org/ffmpeg.html) for more information.
 
 Let's get rid of **Pages/FetchData.razor** and, **Shared/SurveyPrompt.razor**, as we are not going to need them anymore.
 
@@ -372,7 +372,7 @@ Now let's run the app. You will be presented with this:
 
 Click on `Choose File` to select an MP4 video file. The file will load, and play on the Video player. You have the option to just convert the file to MP3, or convert, and download by checking the `Download Output File` box, let's check the box and click the `Convert MP4 to MP3` button.
 
-After clicking the `Convert MP4 to MP3` button, you will see the log entries, progress completed, the downloaded **output.mp3** file, and the Audio player ready to play the MP3 file.
+After clicking the `Convert MP4 to MP3` button, you will see the log messages, the progress completed, the downloaded **output.mp3** file, and the Audio player ready to play the MP3 file.
 
 ![Convert MP4 to MP3 Results](images/b4df9f602d7fa16f71ace37e0ba36c16828aa5a4e4daec38dc7148f9537df875.png)  
 
@@ -582,9 +582,9 @@ Add the following `NavLink` code to the **Pages/NavMenu.razor** page, below the 
 </div>
 ```
 
-Run the app, and go to `Create Video`. Provide an image, an audio file, check the `Download Output File` and press the `Create Video` button.
+Run the app, and go to `Create Video`. Provide an image, an audio file, check the `Download Output File`, and press the `Create Video` button.
 
-You created a video based on an image, and an audio file now.
+You just created a video based on an image, and an audio file.
 
 ![Create Video Results](images/3d9e68d428625843e16631a52c7df26a53dce6b6dfa2bc8544255e8bf5e2056e.png)  
 
@@ -796,7 +796,7 @@ Run the app, and go to `Video Watermark`. Provide an image, a video file, check 
 
 ![Create Video Watermark](images/f253299609b79b76cdd88f00550d0668303cea4608d309f84d104cf2d467c1d3.png)  
 
-You just added a watermark to a video. Just getting better and better.
+You just added a watermark to a video. Just getting better and better huh?
 
 Finally, how about concatenating two videos together? Let's do that now.
 
@@ -1021,7 +1021,7 @@ Add a new `NavLink` to the **Pages/NavMenu.razor** file, below the `Video Waterm
 </div>
 ```
 
-And run the application.
+Now run the application.
 
 After selecting two videos, checking the `Download Output File` box, and clicking the `Concatenate Videos` button, you will be able to see the concatenated video on the third video component, as well in the downloads.
 
@@ -1031,11 +1031,11 @@ You can press play on the third video component, or click on the downloaded file
 
 ## Summary
 
-In this episode, we saw how to edit edit videos, and audio using `FFmpegBlazor` in a Blazor WebAssembly application.
+In this episode, we saw how to edit videos, and audio using `FFmpegBlazor` in a Blazor WebAssembly application.
 
-We were able to extract the audio track of an MP4 video and create an MP3 audio file, create an MP4 video from a single image, and an audio track, add a watermark to a video, and concatenate two videos into one.
+We were able to extract the audio track of an MP4 video and create an MP3 audio file, create an MP4 video from a single image and an audio track, add a watermark to a video, and concatenate two videos into one.
 
-Most importantly, we learned how easy we can leverage `FFmpegBlazor` to basically use any functionally provided by `FFmpeg` in a Blazor WebAssembly application. Now, that's powerful.
+Most importantly, we learned how easily we can leverage `FFmpegBlazor` to basically use any functionally provided by `FFmpeg` in a Blazor WebAssembly application. Now, that's powerful!
 
 For more information about `FFmpeg`, and `FFmpegBlazor`, check the links in the resources section below.
 
